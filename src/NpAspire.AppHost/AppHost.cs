@@ -7,6 +7,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 var auth0Domain = builder.AddParameter("auth0-domain");
 var auth0Audience = builder.AddParameter("auth0-audience");
 
+builder.AddDockerComposeEnvironment("env");
+
 builder.AddProject<Projects.NpAspire_Api>("api")
     .WithEnvironment("Auth0__Domain", auth0Domain)
     .WithEnvironment("Auth0__Audience", auth0Audience)
