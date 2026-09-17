@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+tmp/
+out-tsc/
+.angular/
+coverage/
+
+# Nx
+.nx/cache
+.nx/workspace-data
+.nx/migrate-runs
+.nx/polygraph
+.nx/self-healing
+
+# Playwright
+test-output/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+
+# Local environment files (secrets)
+.env
+.env.local
+.env.*.local
+*.local.env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.secret.tfvars
+crash.log
+
+# IDEs and editors
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.sublime-workspace
+
+# Logs
+npm-debug.log*
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/worktrees
