@@ -13,7 +13,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// No UseHttpsRedirection: TLS terminates at the NGINX gateway.
+// No UseHttpsRedirection for now: TLS termination is decided with the hosting target (docs/spec.md §7).
 
 app.MapDefaultEndpoints();
 app.MapControllers();

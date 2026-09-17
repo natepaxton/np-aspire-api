@@ -2,44 +2,33 @@
 
 Status: early draft. Sections marked **TBD** are open decisions.
 
-This repository holds the **backend** of np-aspire: the .NET API, the Aspire AppHost that orchestrates the system, the NGINX gateway, the Docker Compose output, and the Auth0 configuration. The Angular frontend lives in **[np-aspire](https://github.com/natepaxton/np-aspire)**.
+This repository holds the **backend** of np-aspire: the .NET API, the Aspire AppHost that orchestrates it, and the Auth0 configuration. The Angular frontend lives in **[np-aspire](https://github.com/natepaxton/np-aspire)**.
 
 The two repositories were one Nx monorepo until 2026-09-17. The .NET history was carried over with `git filter-repo`. The combined state is tagged `pre-api-split` in np-aspire.
 
 ## 1. Goal
 
-A .NET API with Aspire as the local development orchestrator. A single `docker compose up` runs the whole system (gateway, API, database, and the frontend's static-site image) as containers, using a compose file that Aspire generates.
+A .NET API orchestrated by **Aspire, the single source of truth** for the backend's topology. There are no hand-written Docker or compose files. When containers or a deployment target are needed, they are produced from the AppHost with Aspire's publishers (§8).
 
-The backend starts as **one API**. A microservices split is deliberately deferred (see §8). The NGINX gateway and the `/api/` route prefix exist now so that split can happen later without changing clients.
+The backend starts as **one API** with no gateway in front of it (decision 2026-09-17). An NGINX gateway is deferred until there are multiple APIs to route (§8). The `/api/v1/` route prefix stays, so a gateway can be added later without changing clients.
 
 ## 2. Architecture
 
 ```
  Browser ──── login ────► Auth0
-    │  HTTP (same origin) + Auth0 access token
+    │  HTTP + Auth0 access token
     ▼
- ┌─────────────────────────────────────────────┐
- │                   NGINX                     │
- │  /        → web (np-aspire static image)    │
- │  /api/    → API (path forwarded as-is)      │
- └──────────────┬──────────────────────────────┘
-                ▼
-          API (.NET, validates JWTs)
-                │
-                ▼
-           PostgreSQL
+ API (.NET, validates JWTs)      ◄── Aspire AppHost (dev orchestration + dashboard)
+    │
+    ▼
+ PostgreSQL (milestone 3)
 ```
 
-- **All browser traffic goes through NGINX.** Clients never call the API's port directly.
-- **Routing:**
-  - NGINX sends `/` to the frontend and `/api/` to the API.
-  - The API owns its full route, including the version: `/api/v1/...`.
-  - NGINX forwards the path unchanged and knows nothing about versions.
-- **Same origin:** the frontend and the API share one origin, so production needs no CORS setup.
+- **Routing:** the API owns its full route, including the version: `/api/v1/...`.
 - **Local development:**
-  - The AppHost runs NGINX (on a fixed host port, planned `8080`), the API, and PostgreSQL.
-  - The frontend runs separately with `nx serve` in np-aspire. Its dev-server proxy forwards `/api` to the gateway, so dev routing matches production.
-- **Frontend in compose:** np-aspire publishes a static-site container image to GHCR (**TBD**, np-aspire milestone). The AppHost references it as a container resource, so the generated compose file includes it.
+  - `dotnet run --project src/NpAspire.AppHost` starts the API, and PostgreSQL from milestone 3, with the Aspire dashboard.
+  - The frontend runs separately with `nx serve` in np-aspire. Its dev-server proxy forwards `/api` to the API's HTTP endpoint (`http://localhost:5104`), so the browser sees one origin and no CORS setup is needed in development.
+- **Production hosting** (same-origin reverse proxy, or CORS on the API) and TLS termination are **TBD** (§7). They will be decided together with the deployment target.
 
 ## 3. Components
 
@@ -52,10 +41,9 @@ The backend starts as **one API**. A microservices split is deliberately deferre
 - Data access:
   - **EF Core** (Npgsql provider) for writes, migrations, and domain persistence.
   - **Dapper** (Npgsql) for read-heavy or performance-sensitive queries.
-- Auth: the API validates **Auth0** access tokens itself (§4). NGINX forwards the `Authorization` header and does not validate tokens.
-- There is no HTTPS redirection, because TLS terminates at NGINX.
+- Auth: the API validates **Auth0** access tokens itself (§4).
+- There is no HTTPS redirection for now. How TLS is terminated is decided with the hosting target (§7).
 - OpenAPI is served in Development (`/openapi/v1.json`). It is the **contract for the frontend**: np-aspire generates its API client from it.
-- The API ships as a Docker image.
 
 **User data model.** Auth0 is the source of truth for identity: credentials, email verification, MFA, and social logins. The API stores only app-specific user data.
 
@@ -83,17 +71,14 @@ The backend starts as **one API**. A microservices split is deliberately deferre
 
 There is **no `AuthController`**. Auth0 handles login, logout, and token issuing and refresh directly with the Angular app.
 
-### 3.2 Orchestration and infrastructure
+### 3.2 Orchestration (Aspire)
 
-- **Aspire AppHost** (`NpAspire.AppHost`) is the single source of truth for the system topology: the API, PostgreSQL, NGINX, and the frontend image. The shared **ServiceDefaults** project (`NpAspire.ServiceDefaults`) supplies OpenTelemetry, health checks, service discovery, and resilience.
-- **docker-compose is generated by Aspire.** The AppHost uses the Docker Compose publisher (`Aspire.Hosting.Docker`, `AddDockerComposeEnvironment`). Running `aspire publish` writes the compose file and its `.env` to `deploy/compose/`.
-  - Never hand-edit the generated files. Change the AppHost and publish again.
-  - Because the compose file is generated, NGINX must be modeled in the AppHost as a container resource with its config mounted.
-- **NGINX** config lives in `infra/nginx/`:
-  - `location /api/` proxies to the API. It keeps the path and sets the `X-Forwarded-*` headers. The API enables `UseForwardedHeaders`.
-  - `location /` proxies to the frontend container, which serves the built Angular app with an SPA fallback to `index.html`.
-- **TLS:** in production, HTTPS terminates at NGINX. HTTP redirects to HTTPS, and HSTS is enabled. NGINX does not log the `Authorization` header. Plain HTTP is acceptable in local dev only.
-- Secrets such as Auth0 settings and the database password come from Aspire parameters or user-secrets in dev and from `.env` for compose. Never commit them.
+- **Aspire AppHost** (`NpAspire.AppHost`) is the **single source of truth** for the backend topology: the API now, and PostgreSQL from milestone 3. Every new resource (database, cache, message broker, service) is added to the AppHost and nowhere else.
+- The shared **ServiceDefaults** project (`NpAspire.ServiceDefaults`) supplies OpenTelemetry, health checks, service discovery, and resilience.
+- **No Docker or compose files are maintained by hand.** A Dockerfile, a hand-written `compose.yaml`, and an NGINX gateway were tried in PR #2 and closed unmerged; the branch `feature/docker-compose` is kept for reference.
+  - When containers are needed, the API image comes from the .NET SDK's container support (`dotnet publish /t:PublishContainer`), which Aspire uses.
+  - Deployment artifacts, such as a compose file, come from the AppHost through an Aspire publisher (`aspire publish`).
+- Secrets such as Auth0 settings and the database password come from Aspire parameters or user-secrets. Never commit them.
 
 ### 3.3 .NET setup
 
@@ -104,8 +89,7 @@ There is **no `AuthController`**. Auth0 handles login, logout, and token issuing
 - `dotnet-tools.json` pins ReportGenerator as a local tool. Run `dotnet tool restore` after cloning.
 - The **Aspire CLI** is _not_ in the tool manifest. On Linux, `dotnet tool restore` fails when the manifest contains `aspire.cli`, which ships platform-specific packages: it reports the other tool as containing only `aspire`. This was reproduced in the `mcr.microsoft.com/dotnet/sdk:10.0` image.
   - `dotnet run --project src/NpAspire.AppHost` works without the CLI, because the AppHost SDK bundles it (`AspireUseCliBundle`).
-  - For `aspire run`, `describe`, and `publish`, install it machine-wide with `curl -sSL https://aspire.dev/install.sh | bash`.
-  - Milestone 4, which runs `aspire publish` in CI, will install it the same way.
+  - For `aspire run`, `describe`, and `publish`, install it machine-wide with `curl -sSL https://aspire.dev/install.sh | bash`. CI will install it the same way if it ever runs `aspire publish`.
 - **Tests:** **xUnit v3** on Microsoft Testing Platform, with `Microsoft.AspNetCore.Mvc.Testing` for in-memory integration tests.
   - Test projects set `<IsTestProject>true</IsTestProject>` and reference `coverlet.MTP`. Coverlet settings live in each project's `testconfig.json`.
 - ServiceDefaults maps `/health` and `/alive` in Development only. Tests verify that they, and the OpenAPI document, return 404 in Production.
@@ -264,7 +248,6 @@ A small wrapper script may replace these in milestone 2.
   6. Upload `coverage/cobertura.xml` to Codecov, and upload the coverage directory as an artifact
 - **Later additions:**
   - `generate-permissions` drift check and `terraform fmt`/`validate` (milestone 2)
-  - Docker image build and an `aspire publish` check (milestone 4)
   - `terraform plan` PR comment
 
 **Code coverage**
@@ -313,14 +296,17 @@ A small wrapper script may replace these in milestone 2.
 ## 7. Open decisions
 
 - How np-aspire consumes the API contract and permission types: an OpenAPI client generator, and whether it reads the document from a committed file, a release artifact, or a running API.
-- The frontend static-site image: its name and tag scheme on GHCR, and how the AppHost pins its version.
+- **Production hosting and TLS:** where the API and the frontend run, whether they share an origin (a platform reverse proxy) or the API enables CORS for the frontend's origin, and where HTTPS terminates.
+- **Deployment target:** which Aspire publisher to use (Docker Compose, Kubernetes, Azure, …), which determines how the API image and deployment files are produced.
 - Remote Terraform state backend (needed before CI runs `terraform apply`).
 
 ## 8. Deferred
 
 - **In-app role management.** An admin UI that assigns Auth0 roles through the Management API.
 - **Backend-for-frontend (BFF)** auth pattern (§4).
-- **Microservices split.** New services go in `src/<Service>/`, and each owns its own database. NGINX gets one new `location /api/v1/<resource>/` block per service. Clients don't change.
+- **NGINX gateway.** Add it when there are multiple APIs to route. It will be an AppHost container resource with a `location /api/v1/<resource>/` block per API, so clients keep calling `/api/v1/...`. It will then also forward headers (`UseForwardedHeaders`), terminate TLS, and serve or route the frontend.
+- **Containers and deployment.** Produced from the AppHost with an Aspire publisher once a deployment target is chosen (§7). This includes the API image, the frontend image, and any compose or cluster files.
+- **Microservices split.** New services go in `src/<Service>/`, and each owns its own database. It comes together with the NGINX gateway above.
 - **RabbitMQ.** Deferred until there is a second service or a background-work need. When added, use `RabbitMQ.Client` directly, wrapped in a small shared messaging library in `src/`.
 
 ## 9. Repository layout
@@ -333,10 +319,7 @@ src/
 tests/
   NpAspire.Api.Tests/         xUnit v3 (Microsoft Testing Platform)
 infra/
-  nginx/                      NGINX gateway config (milestone 4)
   auth0/                      Terraform + permissions.json (milestone 2)
-deploy/
-  compose/                    Generated by `aspire publish`. Do not edit. (milestone 4)
 scripts/
   coverage-check.mjs          Tests with coverage + minimums
 docs/
@@ -368,13 +351,8 @@ Numbering is new to this repository. The equivalent milestone in the original mo
    - Auth0 JWT validation with deny-by-default and permission policies
    - the `Users` table, and `UsersController` (`/me` and the admin `/{id}`)
    - permission names exposed in OpenAPI
-4. **Gateway and containers** [monorepo M4]:
-   - NGINX as an Aspire resource on a fixed dev port
-   - a Dockerfile for the API
-   - the frontend image as a container resource
-   - the Aspire Docker Compose publisher, so `docker compose up` runs the full stack
-   - Aspire CLI install and an `aspire publish` check in CI
-5. ✅ **CI, coverage, Codecov, branch protection, Dependabot, secret scanning** (set up with the repository, 2026-09-17).
+   - (The monorepo's M4, gateway and containers, is deferred; see §8.)
+4. ✅ **CI, coverage, Codecov, branch protection, Dependabot, secret scanning** (set up with the repository, 2026-09-17).
 
 ### Milestone 1 — API skeleton and Aspire ✅
 
