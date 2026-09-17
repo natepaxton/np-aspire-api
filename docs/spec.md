@@ -65,7 +65,7 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 | Controller        | Route                    | Authorization                              | Purpose                                |
 | ----------------- | ------------------------ | ------------------------------------------ | -------------------------------------- |
 | `DiagnosticsController` | `GET /api/v1/diagnostics` | anonymous ✅                          | Diagnostics: overall health as a `ServerResult<int>`; 200, or 503 when unhealthy. |
-| `AuthController`  | `GET /api/v1/auth/check` | any authenticated caller ✅                | Diagnostics: 200 with a valid token, else 401. |
+| `AuthController`  | `GET /api/v1/auth/check` | `read:profile`                             | Diagnostics: 200 with a valid token that grants `read:profile`, 401 without a usable token, 403 for a user with no role. |
 | `UsersController` | `GET /api/v1/users/me`   | `read:profile`                             | Get or provision the caller's record.  |
 | `UsersController` | `PUT /api/v1/users/me`   | `update:profile`                           | Update the caller's app-specific data. |
 | `UsersController` | `GET /api/v1/users/{id}` | `read:users` permission (the `admin` role) | Admin lookup of any user.              |
@@ -136,7 +136,7 @@ Flow: the SPA uses **Authorization Code + PKCE** (see np-web's spec), and the AP
     ```
   - If they're missing, the Aspire dashboard asks for them.
 - **Testing without Auth0:** `tests/.../Infrastructure/ApiFactory.cs` hosts the API with test settings and swaps the tenant metadata for a local RSA key through a static OpenID configuration. `ApiFactory.CreateToken(...)` issues valid or deliberately invalid tokens: expired, wrong audience, wrong issuer, untrusted key, HS256, or malformed.
-- **Manual testing:** get a token from the Auth0 dashboard (Applications → APIs → your API → **Test** tab). Then call `GET http://localhost:5104/api/v1/auth/check` with `Authorization: Bearer <token>`, using Postman or the `NpAspire.Api.http` request, which reads `accessToken` from the gitignored `http-client.private.env.json`.
+- **Manual testing:** get a token from the Auth0 dashboard (Applications → APIs → your API → **Test** tab). A dashboard test token carries no permissions, so `auth/check` answers 403; log in as a test user through the SPA for a token that grants `read:profile`. Then call `GET http://localhost:5104/api/v1/auth/check` with `Authorization: Bearer <token>`, using Postman or the `NpAspire.Api.http` request, which reads `accessToken` from the gitignored `http-client.private.env.json`.
 - **Permissions** (milestone 3): map the token's `permissions` claim to named policies (for example `[Authorize(Policy = "read:users")]`). See §5.
 - Identify the caller only from the `sub` claim.
 - Add rate limiting (`Microsoft.AspNetCore.RateLimiting`) to authenticated endpoints (milestone 3).
