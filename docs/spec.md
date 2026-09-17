@@ -8,7 +8,7 @@ The two repositories were one Nx monorepo until 2026-09-17. The .NET history was
 
 ## 1. Goal
 
-A .NET API orchestrated by **Aspire, the single source of truth** for the backend's topology. There are no hand-written Docker or compose files. When containers or a deployment target are needed, they are produced from the AppHost with Aspire's publishers (§8).
+A .NET API orchestrated by **Aspire, the single source of truth** for the backend's topology. There are no hand-written Docker or compose files. Deployment files are generated from the AppHost by Aspire's **Docker Compose** publisher (decision 2026-09-17, §3.2).
 
 The backend starts as **one API** with no gateway in front of it (decision 2026-09-17). An NGINX gateway is deferred until there are multiple APIs to route (§8). The `/api/v1/` route prefix stays, so a gateway can be added later without changing clients.
 
@@ -80,7 +80,12 @@ Routes use a literal `api/v1/` prefix until `Asp.Versioning.Mvc` is added in mil
 - The shared **ServiceDefaults** project (`NpAspire.ServiceDefaults`) supplies OpenTelemetry, health checks, service discovery, and resilience.
 - **No Docker or compose files are maintained by hand.** A Dockerfile, a hand-written `compose.yaml`, and an NGINX gateway were tried in PR #2 and closed unmerged; the branch `feature/docker-compose` is kept for reference.
   - When containers are needed, the API image comes from the .NET SDK's container support (`dotnet publish /t:PublishContainer`), which Aspire uses.
-  - Deployment artifacts, such as a compose file, come from the AppHost through an Aspire publisher (`aspire publish`).
+  - Deployment artifacts come from the AppHost through an Aspire publisher (`aspire publish`).
+- **Deployment target: Docker Compose** (decision 2026-09-17).
+  - The AppHost declares a Docker Compose environment (`builder.AddDockerComposeEnvironment("env")`, package `Aspire.Hosting.Docker`).
+  - `aspire publish` writes `docker-compose.yaml` and `.env` files to `src/NpAspire.AppHost/aspire-output/`. The output is generated, so it is gitignored and never edited by hand. Regenerate it after changing the AppHost.
+  - The generated compose file includes an Aspire dashboard (`env-dashboard`) that receives the API's telemetry. The API image (`API_IMAGE`) and the Auth0 settings (`AUTH0_DOMAIN`, `AUTH0_AUDIENCE`) are supplied through the `.env` values.
+  - Where the compose stack runs, and how TLS is terminated, is still open (§7).
 - Secrets such as Auth0 settings and the database password come from Aspire parameters or user-secrets. Never commit them.
 
 ### 3.3 .NET setup
@@ -314,8 +319,7 @@ A small wrapper script may replace these in milestone 2.
 ## 7. Open decisions
 
 - How np-aspire consumes the API contract and permission types: an OpenAPI client generator, and whether it reads the document from a committed file, a release artifact, or a running API.
-- **Production hosting and TLS:** where the API and the frontend run, whether they share an origin (a platform reverse proxy) or the API enables CORS for the frontend's origin, and where HTTPS terminates.
-- **Deployment target:** which Aspire publisher to use (Docker Compose, Kubernetes, Azure, …), which determines how the API image and deployment files are produced.
+- **Production hosting and TLS:** where the Docker Compose stack (§3.2) and the frontend run, whether they share an origin (a platform reverse proxy) or the API enables CORS for the frontend's origin, and where HTTPS terminates.
 - Remote Terraform state backend (needed before CI runs `terraform apply`).
 
 ## 8. Deferred
@@ -323,7 +327,7 @@ A small wrapper script may replace these in milestone 2.
 - **In-app role management.** An admin UI that assigns Auth0 roles through the Management API.
 - **Backend-for-frontend (BFF)** auth pattern (§4).
 - **NGINX gateway.** Add it when there are multiple APIs to route. It will be an AppHost container resource with a `location /api/v1/<resource>/` block per API, so clients keep calling `/api/v1/...`. It will then also forward headers (`UseForwardedHeaders`), terminate TLS, and serve or route the frontend.
-- **Containers and deployment.** Produced from the AppHost with an Aspire publisher once a deployment target is chosen (§7). This includes the API image, the frontend image, and any compose or cluster files.
+- **Deployment pipeline.** The Docker Compose publisher is set up (§3.2). Still deferred: building and pushing the API image, the frontend image, a production host (§7), and running `aspire publish` or deploying from CI.
 - **Microservices split.** New services go in `src/<Service>/`, and each owns its own database. It comes together with the NGINX gateway above.
 - **RabbitMQ.** Deferred until there is a second service or a background-work need. When added, use `RabbitMQ.Client` directly, wrapped in a small shared messaging library in `src/`.
 
@@ -370,7 +374,7 @@ Numbering is new to this repository. The equivalent milestone in the original mo
    - permission policies
    - the `Users` table, and `UsersController` (`/me` and the admin `/{id}`)
    - permission names exposed in OpenAPI
-   - (The monorepo's M4, gateway and containers, is deferred; see §8.)
+   - (From the monorepo's M4, the gateway is deferred (§8). The Docker Compose publisher was added early, 2026-09-17; see §3.2.)
 4. ✅ **CI, coverage, Codecov, branch protection, Dependabot, secret scanning** (set up with the repository, 2026-09-17).
 
 ### Milestone 1 — API skeleton and Aspire ✅
