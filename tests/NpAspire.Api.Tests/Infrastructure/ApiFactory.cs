@@ -45,7 +45,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         string audience = Audience,
         DateTime? expires = null,
         SigningCredentials? signingCredentials = null,
-        string subject = "auth0|test-user")
+        string subject = "auth0|test-user",
+        params string[] permissions)
     {
         var expiresAt = expires ?? DateTime.UtcNow.AddMinutes(5);
 
@@ -53,7 +54,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         {
             Issuer = issuer,
             Audience = audience,
-            Subject = new ClaimsIdentity([new Claim("sub", subject)]),
+            Subject = new ClaimsIdentity([
+                new Claim("sub", subject),
+                .. permissions.Select(permission => new Claim("permissions", permission)),
+            ]),
             IssuedAt = expiresAt.AddHours(-1),
             NotBefore = expiresAt.AddHours(-1),
             Expires = expiresAt,

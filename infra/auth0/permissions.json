@@ -1,0 +1,20 @@
+{
+  "permissions": [
+    { "value": "read:profile", "description": "Read your own profile" },
+    { "value": "update:profile", "description": "Update your own profile" },
+    { "value": "read:users", "description": "Read any user's profile" }
+  ],
+  "roles": [
+    {
+      "name": "member",
+      "description": "Standard user",
+      "default": true,
+      "permissions": ["read:profile", "update:profile"]
+    },
+    {
+      "name": "admin",
+      "description": "Administrator",
+      "permissions": ["read:profile", "update:profile", "read:users"]
+    }
+  ]
+}

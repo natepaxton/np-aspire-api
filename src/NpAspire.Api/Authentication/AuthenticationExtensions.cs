@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using NpAspire.Api.Authorization;
 
 namespace NpAspire.Api.Authentication;
 
@@ -32,9 +33,10 @@ public static class AuthenticationExtensions
                 jwt.TokenValidationParameters.ValidAlgorithms = [SecurityAlgorithms.RsaSha256];
             });
 
-        // Deny by default.
+        // Deny by default, then one policy per permission (Permissions.g.cs, from infra/auth0/permissions.json).
         services.AddAuthorizationBuilder()
-            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+            .AddPermissionPolicies();
 
         return services;
     }

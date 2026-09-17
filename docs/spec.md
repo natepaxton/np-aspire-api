@@ -45,7 +45,7 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 - There is no HTTPS redirection for now. How TLS is terminated is decided with the hosting target (§7).
 - **Data Protection keys are kept in memory** (`AddInMemoryDataProtectionKeys`, `DataProtection/`). The API protects nothing, because it uses bearer tokens only (no cookies, sessions, or antiforgery). ASP.NET Core still creates a key at startup, and by default writes it unencrypted to the container's disk, which logged two warnings on every deployed start.
   - The keys are regenerated on every start and differ between instances.
-  - Before anything relies on protected data, such as BFF cookie auth (§8), persist the keys to shared storage (for example PostgreSQL) and encrypt them with a certificate.
+  - **This is temporary.** A later story replaces it as part of a proper auth flow: when login moves server-side (BFF cookie auth, §8), the in-memory store is removed and the keys are persisted to shared storage (for example PostgreSQL) and encrypted with a certificate. Nothing may rely on protected data until then.
 - OpenAPI is served in Development (`/openapi/v1.json`). It is the **contract for the frontend**: np-aspire generates its API client from it.
 
 **User data model.** Auth0 is the source of truth for identity: credentials, email verification, MFA, and social logins. The API stores only app-specific user data.
@@ -116,7 +116,7 @@ The `api/v1` prefix is applied to every controller by an MVC convention (`Routin
 Flow: the SPA uses **Authorization Code + PKCE** (see np-aspire's spec), and the API validates the resulting **access tokens**.
 
 - An Auth0 **API** (resource server) is registered. Its identifier is the token audience, which makes the SPA's tokens JWT access tokens and not opaque ones.
-  - Until Terraform manages the tenant (milestone 2), the API is created by hand in the Auth0 dashboard (Applications → APIs, signing algorithm RS256). Milestone 2 will `terraform import` it.
+  - Terraform creates it (§5.2). In the dev tenant it is `https://api.np-aspire.com`, applied 2026-09-17. The identifier is a name, not an address: nothing calls it. Changing it later invalidates every issued token.
 - **Implemented** in `Authentication/AuthenticationExtensions.cs` (`AddAuth0Authentication`) with `Microsoft.AspNetCore.Authentication.JwtBearer`:
   - Configuration comes from the `Auth0` section, bound to `Auth0Options` (`Domain`, `Audience`). It is validated at startup (`ValidateOnStart`), so the API refuses to start without it.
   - `Authority = https://<Domain>/`. A leading `https://` or trailing `/` in `Domain` is tolerated.
@@ -197,7 +197,9 @@ There are two layers, split by what each system can know.
 }
 ```
 
-- A generator script (`scripts/generate-permissions`, implementation chosen in milestone 2) writes `src/NpAspire.Api/Authorization/Permissions.g.cs`: C# constants, plus a registration helper that creates one authorization policy per permission.
+- `scripts/generate-permissions.mjs` (Node, like `coverage-check.mjs`) writes `src/NpAspire.Api/Authorization/Permissions.g.cs`: C# constants, an `All` array, and `AddPermissionPolicies()`, which adds one policy per permission, named after it and requiring that value in the `permissions` claim. `AddAuth0Authentication` calls it after setting the deny-by-default fallback policy.
+  - `node scripts/generate-permissions.mjs` regenerates the file; `--check` fails instead of writing, which is what CI runs.
+  - The script rejects a manifest with duplicate permissions, a permission that isn't `<action>:<resource>`, a role granting an unknown permission, or anything other than exactly one default role.
 - Generated files are committed and never edited by hand. CI regenerates them and fails if the output differs from what's committed (`git diff --exit-code`).
 - Auth0 itself is configured from the same manifest (§5.2), so the names in the tenant match too.
 - `"default": true` marks the role the Post-Login Action assigns. Exactly one role may be the default, and the generator validates this. It also checks that every role permission exists in `permissions`.
@@ -236,7 +238,7 @@ What gets configured:
 
 **Layout:**
 
-- `providers.tf`, `variables.tf`, `outputs.tf`
+- `providers.tf`, `variables.tf`, `outputs.tf`, `locals.tf` (reads the manifest, resolves the default role)
 - `api.tf`: resource server, RBAC, token lifetime
 - `rbac.tf`: permissions and roles, from the manifest
 - `spa.tf`: SPA client and its URLs
@@ -246,9 +248,9 @@ What gets configured:
 
 **Test users** (dev tenant only, `create_test_users = true`):
 
-- `test-member@<domain>` with the `member` role
-- `test-admin@<domain>` with the `admin` role
-- `test-norole@<domain>` with no role, to verify the 403 behavior
+- `test-member@np-aspire.test` with the `member` role
+- `test-admin@np-aspire.test` with the `admin` role
+- `test-norole@np-aspire.test` with no role, to verify the 403 behavior
 - Passwords come from secret variables and never from committed files. np-aspire's Playwright tests use the same credentials (GitHub secrets in that repo's CI).
 
 **Commands** (planned; no Nx in this repo). Load the env file first with `set -a; source infra/auth0/.env.local; set +a`, then:
@@ -273,13 +275,14 @@ A small wrapper script may replace these in milestone 2.
 - **`Build and test` job:**
   1. `dotnet tool restore` and `dotnet restore`, with a NuGet cache
   2. `dotnet format --verify-no-changes`
-  3. `dotnet build`
-  4. `node scripts/coverage-check.mjs …`: tests with coverage and minimums
-  5. ReportGenerator's Markdown summary written to the job summary
-  6. Upload `coverage/cobertura.xml` to Codecov, and upload the coverage directory as an artifact
+  3. `node scripts/generate-permissions.mjs --check`: fails if `Permissions.g.cs` is stale
+  4. `terraform fmt -check -recursive`, `terraform init -backend=false`, and `terraform validate` on `infra/auth0` (pinned Terraform version, no credentials: neither command reaches the tenant)
+  5. `dotnet build`
+  6. `node scripts/coverage-check.mjs …`: tests with coverage and minimums
+  7. ReportGenerator's Markdown summary written to the job summary
+  8. Upload `coverage/cobertura.xml` to Codecov, and upload the coverage directory as an artifact
 - **Later additions:**
-  - `generate-permissions` drift check and `terraform fmt`/`validate` (milestone 2)
-  - `terraform plan` PR comment
+  - `terraform plan` PR comment (needs tenant credentials in CI, and a remote state backend; §7)
 
 **Code coverage**
 
@@ -322,7 +325,7 @@ A small wrapper script may replace these in milestone 2.
     - `nuget`: `Directory.Packages.props`, the AppHost SDK version, and `dotnet-tools.json`. Grouped as `aspire`, `aspnetcore-and-extensions`, `opentelemetry`, `testing`, and `minor-and-patch`.
     - `dotnet-sdk`: `global.json`, excluding major versions.
     - `github-actions`
-    - Add `terraform` in milestone 2.
+    - `terraform`: the Auth0 provider, from `infra/auth0/.terraform.lock.hcl`, grouped as `terraform` with the same cooldown as NuGet.
 
 ## 7. Open decisions
 
@@ -333,7 +336,7 @@ A small wrapper script may replace these in milestone 2.
 ## 8. Deferred
 
 - **In-app role management.** An admin UI that assigns Auth0 roles through the Management API.
-- **Backend-for-frontend (BFF)** auth pattern (§4). It needs persisted, encrypted Data Protection keys (§3.1).
+- **Backend-for-frontend (BFF)** auth pattern (§4). That story also removes the in-memory Data Protection keys and replaces them with persisted, encrypted keys (§3.1).
 - **NGINX gateway.** Add it when there are multiple APIs to route. It will be an AppHost container resource with a `location /api/v1/<resource>/` block per API, so clients keep calling `/api/v1/...`. It will then also forward headers (`UseForwardedHeaders`), terminate TLS, and serve or route the frontend.
 - **Deployment pipeline.** The Docker Compose publisher is set up (§3.2). Still deferred: building and pushing the API image, the frontend image, a production host (§7), and running `aspire publish` or deploying from CI.
 - **Microservices split.** New services go in `src/<Service>/`, and each owns its own database. It comes together with the NGINX gateway above.
@@ -371,10 +374,10 @@ codecov.yml
 Numbering is new to this repository. The equivalent milestone in the original monorepo plan is shown in brackets.
 
 1. ✅ **API skeleton and Aspire** [monorepo M2] (done 2026-09-17). Details below.
-2. **Permissions and Auth0** [part of monorepo M3]:
-   - `permissions.json` and the generator, with a CI drift check
-   - Terraform for the dev tenant: API, roles, SPA client, Post-Login Action, test users
-   - Dependabot `terraform` ecosystem, and `terraform fmt`/`validate` in CI
+2. ✅ **Permissions and Auth0** [part of monorepo M3] (done 2026-09-17):
+   - ✅ `permissions.json`, the generator, and its CI drift check (done 2026-09-17)
+   - ✅ Terraform applied to the dev tenant 2026-09-17: API (`https://api.np-aspire.com`), permissions, `member`/`admin` roles, SPA client, `role-assigner` M2M client, Post-Login Action and trigger, three test users
+   - ✅ Dependabot `terraform` ecosystem, and `terraform fmt`/`validate` in CI (done 2026-09-17)
 3. **API features** [rest of monorepo M3]:
    - PostgreSQL (Aspire resource), EF Core, Dapper
    - API versioning
