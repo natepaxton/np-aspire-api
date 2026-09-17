@@ -8,7 +8,7 @@ namespace NpAspire.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize]
-[Route("api/v1/auth")]
+[Route("auth")]
 public sealed class AuthController : ControllerBase
 {
     /// <summary>Returns 200 when the request has a valid access token for this API, otherwise 401.</summary>

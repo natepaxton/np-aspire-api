@@ -21,11 +21,27 @@ public sealed class ServerResult<T>
     /// <summary>Success messages collected while handling the request.</summary>
     public List<string> SuccessMessages { get; } = [];
 
-    /// <summary>Records an error by its <see cref="Exception.Message"/>.</summary>
-    public void AddError(Exception exception)
+    /// <summary>Stack traces of errors that occurred while handling the request (Development only).</summary>
+    public List<string> StackTrace { get; } = [];
+
+    /// <summary>
+    /// Records an error by its <see cref="Exception.Message"/> and, when <paramref name="includeStackTrace"/> is set
+    /// and the exception was thrown, its <see cref="Exception.StackTrace"/>.
+    /// </summary>
+    /// <param name="exception">The error to record.</param>
+    /// <param name="includeStackTrace">
+    /// Whether to record the stack trace. Pass <c>true</c> only in Development: stack traces reveal code structure.
+    /// </param>
+    public void AddError(Exception exception, bool includeStackTrace = false)
     {
         ArgumentNullException.ThrowIfNull(exception);
         ErrorMessages.Add(exception.Message);
+
+        // An exception that was created but never thrown has no stack trace.
+        if (includeStackTrace && exception.StackTrace is not null)
+        {
+            StackTrace.Add(exception.StackTrace);
+        }
     }
 
     public bool HasErrors() => ErrorMessages.Count > 0;
