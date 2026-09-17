@@ -43,6 +43,9 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
   - **Dapper** (Npgsql) for read-heavy or performance-sensitive queries.
 - Auth: the API validates **Auth0** access tokens itself (§4).
 - There is no HTTPS redirection for now. How TLS is terminated is decided with the hosting target (§7).
+- **Data Protection keys are kept in memory** (`AddInMemoryDataProtectionKeys`, `DataProtection/`). The API protects nothing, because it uses bearer tokens only (no cookies, sessions, or antiforgery). ASP.NET Core still creates a key at startup, and by default writes it unencrypted to the container's disk, which logged two warnings on every deployed start.
+  - The keys are regenerated on every start and differ between instances.
+  - Before anything relies on protected data, such as BFF cookie auth (§8), persist the keys to shared storage (for example PostgreSQL) and encrypt them with a certificate.
 - OpenAPI is served in Development (`/openapi/v1.json`). It is the **contract for the frontend**: np-aspire generates its API client from it.
 
 **User data model.** Auth0 is the source of truth for identity: credentials, email verification, MFA, and social logins. The API stores only app-specific user data.
@@ -330,7 +333,7 @@ A small wrapper script may replace these in milestone 2.
 ## 8. Deferred
 
 - **In-app role management.** An admin UI that assigns Auth0 roles through the Management API.
-- **Backend-for-frontend (BFF)** auth pattern (§4).
+- **Backend-for-frontend (BFF)** auth pattern (§4). It needs persisted, encrypted Data Protection keys (§3.1).
 - **NGINX gateway.** Add it when there are multiple APIs to route. It will be an AppHost container resource with a `location /api/v1/<resource>/` block per API, so clients keep calling `/api/v1/...`. It will then also forward headers (`UseForwardedHeaders`), terminate TLS, and serve or route the frontend.
 - **Deployment pipeline.** The Docker Compose publisher is set up (§3.2). Still deferred: building and pushing the API image, the frontend image, a production host (§7), and running `aspire publish` or deploying from CI.
 - **Microservices split.** New services go in `src/<Service>/`, and each owns its own database. It comes together with the NGINX gateway above.

@@ -1,4 +1,5 @@
 using NpAspire.Api.Authentication;
+using NpAspire.Api.DataProtection;
 using NpAspire.Api.Routing;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddAuth0Authentication(builder.Configuration);
+builder.Services.AddInMemoryDataProtectionKeys();
 builder.Services.AddControllers(options =>
     options.Conventions.Add(new RoutePrefixConvention(RoutePrefixConvention.Api)));
 builder.Services.AddOpenApi();
