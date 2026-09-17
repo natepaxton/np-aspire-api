@@ -1,0 +1,11 @@
+@NpAspire.Api_HostAddress = http://localhost:5104
+
+GET {{NpAspire.Api_HostAddress}}/health
+Accept: text/plain
+
+###
+
+GET {{NpAspire.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
