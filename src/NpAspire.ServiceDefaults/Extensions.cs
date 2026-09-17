@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string ManagementPortKey = "HealthChecks:ManagementPort";
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -108,18 +110,30 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive
+        var livenessOptions = new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        };
+
         // Adding health checks endpoints to applications in non-development environments has security implications.
         // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
         if (app.Environment.IsDevelopment())
         {
             // All health checks must pass for app to be considered ready to accept traffic after starting
             app.MapHealthChecks(HealthEndpointPath);
+            app.MapHealthChecks(AlivenessEndpointPath, livenessOptions);
+            return app;
+        }
 
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
+        // Outside Development, health checks are served only on an internal management port (for container
+        // health checks). The gateway never routes to it and it isn't published. Matching is on the connection's
+        // local port, not the Host header, so it can't be reached by spoofing the port.
+        var managementPort = app.Configuration.GetValue<int?>(ManagementPortKey);
+        if (managementPort is int port)
+        {
+            app.UseHealthChecks(HealthEndpointPath, port);
+            app.UseHealthChecks(AlivenessEndpointPath, port, livenessOptions);
         }
 
         return app;
