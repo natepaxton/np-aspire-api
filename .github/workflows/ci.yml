@@ -53,6 +53,18 @@ jobs:
       - name: Permissions drift check
         run: node scripts/generate-permissions.mjs --check
 
+      # Auth0 configuration (infra/auth0). No credentials: fmt and validate never reach the tenant.
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.3
+          terraform_wrapper: false
+
+      - name: Terraform format and validate
+        run: |
+          terraform -chdir=infra/auth0 fmt -check -recursive
+          terraform -chdir=infra/auth0 init -backend=false -input=false
+          terraform -chdir=infra/auth0 validate
+
       - name: Build
         run: dotnet build np-aspire-api.slnx --no-restore
 

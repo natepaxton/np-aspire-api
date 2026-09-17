@@ -275,13 +275,14 @@ A small wrapper script may replace these in milestone 2.
 - **`Build and test` job:**
   1. `dotnet tool restore` and `dotnet restore`, with a NuGet cache
   2. `dotnet format --verify-no-changes`
-  3. `dotnet build`
-  4. `node scripts/coverage-check.mjs …`: tests with coverage and minimums
-  5. ReportGenerator's Markdown summary written to the job summary
-  6. Upload `coverage/cobertura.xml` to Codecov, and upload the coverage directory as an artifact
+  3. `node scripts/generate-permissions.mjs --check`: fails if `Permissions.g.cs` is stale
+  4. `terraform fmt -check -recursive`, `terraform init -backend=false`, and `terraform validate` on `infra/auth0` (pinned Terraform version, no credentials: neither command reaches the tenant)
+  5. `dotnet build`
+  6. `node scripts/coverage-check.mjs …`: tests with coverage and minimums
+  7. ReportGenerator's Markdown summary written to the job summary
+  8. Upload `coverage/cobertura.xml` to Codecov, and upload the coverage directory as an artifact
 - **Later additions:**
-  - ✅ `generate-permissions` drift check (`node scripts/generate-permissions.mjs --check`, runs before the build); `terraform fmt`/`validate` still to add
-  - `terraform plan` PR comment
+  - `terraform plan` PR comment (needs tenant credentials in CI, and a remote state backend; §7)
 
 **Code coverage**
 
@@ -324,7 +325,7 @@ A small wrapper script may replace these in milestone 2.
     - `nuget`: `Directory.Packages.props`, the AppHost SDK version, and `dotnet-tools.json`. Grouped as `aspire`, `aspnetcore-and-extensions`, `opentelemetry`, `testing`, and `minor-and-patch`.
     - `dotnet-sdk`: `global.json`, excluding major versions.
     - `github-actions`
-    - Add `terraform` in milestone 2.
+    - `terraform`: the Auth0 provider, from `infra/auth0/.terraform.lock.hcl`, grouped as `terraform` with the same cooldown as NuGet.
 
 ## 7. Open decisions
 
@@ -373,10 +374,10 @@ codecov.yml
 Numbering is new to this repository. The equivalent milestone in the original monorepo plan is shown in brackets.
 
 1. ✅ **API skeleton and Aspire** [monorepo M2] (done 2026-09-17). Details below.
-2. **Permissions and Auth0** [part of monorepo M3]:
+2. ✅ **Permissions and Auth0** [part of monorepo M3] (done 2026-09-17):
    - ✅ `permissions.json`, the generator, and its CI drift check (done 2026-09-17)
    - ✅ Terraform applied to the dev tenant 2026-09-17: API (`https://api.np-aspire.com`), permissions, `member`/`admin` roles, SPA client, `role-assigner` M2M client, Post-Login Action and trigger, three test users
-   - Dependabot `terraform` ecosystem, and `terraform fmt`/`validate` in CI
+   - ✅ Dependabot `terraform` ecosystem, and `terraform fmt`/`validate` in CI (done 2026-09-17)
 3. **API features** [rest of monorepo M3]:
    - PostgreSQL (Aspire resource), EF Core, Dapper
    - API versioning
