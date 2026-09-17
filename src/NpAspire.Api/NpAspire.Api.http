@@ -14,6 +14,10 @@ Accept: text/plain
 GET {{apiHost}}/openapi/v1.json
 Accept: application/json
 
+### Status check: overall health (data: 0 Unhealthy, 1 Degraded, 2 Healthy); 503 when unhealthy. No token needed.
+GET {{apiHost}}/api/v1/diagnostics
+Accept: application/json
+
 ### Auth check: 200 with a valid Auth0 access token for this API, 401 otherwise.
 # Rider: put the token in http-client.private.env.json (gitignored) next to this file:
 #   { "dev": { "accessToken": "<access token>" } }

@@ -39,6 +39,41 @@ public class ServerResultTests
     }
 
     [Fact]
+    public void AddError_AppendsTheStackTrace_WhenRequested()
+    {
+        var result = new ServerResult<string>();
+        var exception = Assert.Throws<InvalidOperationException>(Fail);
+
+        result.AddError(exception, includeStackTrace: true);
+        result.AddError(exception, includeStackTrace: true);
+
+        Assert.Equal([exception.StackTrace!, exception.StackTrace!], result.StackTrace);
+    }
+
+    [Fact]
+    public void AddError_OmitsTheStackTrace_ByDefault()
+    {
+        var result = new ServerResult<string>();
+        var exception = Assert.Throws<InvalidOperationException>(Fail);
+
+        result.AddError(exception);
+
+        Assert.Equal(["thrown"], result.ErrorMessages);
+        Assert.Empty(result.StackTrace);
+    }
+
+    [Fact]
+    public void AddError_SkipsTheStackTrace_OfAnExceptionThatWasNeverThrown()
+    {
+        var result = new ServerResult<string>();
+
+        result.AddError(new InvalidOperationException("not thrown"), includeStackTrace: true);
+
+        Assert.Single(result.ErrorMessages);
+        Assert.Empty(result.StackTrace);
+    }
+
+    [Fact]
     public void AddError_Throws_WhenExceptionIsNull()
     {
         var result = new ServerResult<string>();
@@ -80,4 +115,6 @@ public class ServerResultTests
 
         Assert.Equal(expected, result.IsSuccessful());
     }
+
+    private static void Fail() => throw new InvalidOperationException("thrown");
 }

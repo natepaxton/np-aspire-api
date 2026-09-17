@@ -61,6 +61,7 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 
 | Controller        | Route                    | Authorization                              | Purpose                                |
 | ----------------- | ------------------------ | ------------------------------------------ | -------------------------------------- |
+| `DiagnosticsController` | `GET /api/v1/diagnostics` | anonymous ✅                          | Diagnostics: overall health as a `ServerResult<int>`; 200, or 503 when unhealthy. |
 | `AuthController`  | `GET /api/v1/auth/check` | any authenticated caller ✅                | Diagnostics: 200 with a valid token, else 401. |
 | `UsersController` | `GET /api/v1/users/me`   | `read:profile`                             | Get or provision the caller's record.  |
 | `UsersController` | `PUT /api/v1/users/me`   | `update:profile`                           | Update the caller's app-specific data. |
@@ -70,9 +71,13 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 - In a browser app, the API cannot tell "the app" apart from "the user": every request carries the user's token, and the user can replay it with any HTTP tool. Rules must therefore be written in terms of _what this user may access_. For a user's own data that is `/me`. `/users/{id}` is admin-only.
 - `GET /users/me` also returns the caller's `permissions`, taken from the validated token, so the UI can show or hide admin features.
 
+`DiagnosticsController` is a public status check (`CheckStatus`). It runs every registered health check (`HealthCheckService`) and returns a `ServerResult<int>` whose `Data` is the overall `HealthStatus` (0 Unhealthy, 1 Degraded, 2 Healthy). Unhealthy returns 503; Degraded returns 200 with a warning. Because it is anonymous, it returns only the overall status, never check names or details. Health checks registered by Aspire client integrations (such as the PostgreSQL one in milestone 3) are included automatically. If the checks can't run at all, it returns 500 with the exception's message in `ErrorMessages`. The stack trace is added to `StackTrace` only in Development (`AddError(exception, includeStackTrace: …)`), because stack traces reveal code structure.
+
+**Response envelope:** `ServerResult<T>` (`src/NpAspire.Api/Common/`) wraps a call's `Data` with its `StatusCode` and the `ErrorMessages`, `StackTrace`, `WarningMessages`, and `SuccessMessages` collected while handling it. Related extension methods and enums go in the same folder.
+
 `AuthController` is for **diagnostics only**: it lets you confirm that a token is accepted, for example from Postman, Rider, or the frontend. It has **no login, logout, or token endpoints**. Auth0 handles those directly with the Angular app.
 
-Routes use a literal `api/v1/` prefix until `Asp.Versioning.Mvc` is added in milestone 3.
+The `api/v1` prefix is applied to every controller by an MVC convention (`Routing/RoutePrefixConvention`, registered in `Program.cs`), so controllers declare only their resource, for example `[Route("diagnostics")]`. An absolute template (`/…` or `~/…`) opts a controller out. Non-controller endpoints (`/health`, `/alive`, `/openapi/v1.json`) are not prefixed. When `Asp.Versioning.Mvc` is added in milestone 3, the prefix becomes `api/v{version:apiVersion}`.
 
 ### 3.2 Orchestration (Aspire)
 
@@ -117,7 +122,7 @@ Flow: the SPA uses **Authorization Code + PKCE** (see np-aspire's spec), and the
   - Only **RS256** is accepted (`ValidAlgorithms`).
   - `MapInboundClaims = false` keeps Auth0's claim names (`sub`, `permissions`), and `NameClaimType = "sub"`.
 - **Deny by default (implemented):** a fallback authorization policy requires an authenticated user on every endpoint.
-  - Anonymous endpoints opt out explicitly with `AllowAnonymous()`: the Development health checks and the Development OpenAPI document.
+  - Anonymous endpoints opt out explicitly with `AllowAnonymous()`: the Development health checks, the Development OpenAPI document, and `GET /api/v1/diagnostics`.
   - **Anonymous requests to unknown routes get 401, not 404**, so unauthenticated callers can't find out which routes exist. Authenticated callers get 404.
 - **Local configuration:** the AppHost defines two Aspire **parameters**, `auth0-domain` and `auth0-audience`, and passes them to the API as `Auth0__Domain` and `Auth0__Audience`. Neither is a secret.
   - Set them once in the AppHost's user secrets:
