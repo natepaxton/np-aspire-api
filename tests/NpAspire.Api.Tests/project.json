@@ -1,0 +1,14 @@
+{
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "test": {
+      "outputs": ["{projectRoot}/TestResults", "{workspaceRoot}/coverage/apps/api"],
+      "configurations": {
+        "ci": {
+          "command": "node ../../../../tools/scripts/dotnet-test-coverage.mjs --out coverage/apps/api --lines 80 --branches 75 --methods 80",
+          "args": []
+        }
+      }
+    }
+  }
+}

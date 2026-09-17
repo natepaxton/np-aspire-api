@@ -1,0 +1,12 @@
+{
+  "platformOptions": {
+    "Coverlet": {
+      "include": "[NpAspire.Api]*",
+      "excludeByFile": "**/Migrations/*.cs,**/*.g.cs",
+      "excludeByAttribute": "GeneratedCode,GeneratedCodeAttribute,ExcludeFromCodeCoverage,ExcludeFromCodeCoverageAttribute,CompilerGeneratedAttribute",
+      "format": "cobertura",
+      "skipAutoProps": true,
+      "excludeAssembliesWithoutSources": "MissingAll"
+    }
+  }
+}
