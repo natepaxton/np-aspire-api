@@ -13,3 +13,10 @@ Accept: text/plain
 ### OpenAPI document (Development only)
 GET {{apiHost}}/openapi/v1.json
 Accept: application/json
+
+### Auth check: 200 with a valid Auth0 access token for this API, 401 otherwise.
+# Rider: put the token in http-client.private.env.json (gitignored) next to this file:
+#   { "dev": { "accessToken": "<access token>" } }
+# and run the request with the "dev" environment selected.
+GET {{apiHost}}/api/v1/auth/check
+Authorization: Bearer {{accessToken}}

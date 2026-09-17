@@ -61,6 +61,7 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 
 | Controller        | Route                    | Authorization                              | Purpose                                |
 | ----------------- | ------------------------ | ------------------------------------------ | -------------------------------------- |
+| `AuthController`  | `GET /api/v1/auth/check` | any authenticated caller ✅                | Diagnostics: 200 with a valid token, else 401. |
 | `UsersController` | `GET /api/v1/users/me`   | `read:profile`                             | Get or provision the caller's record.  |
 | `UsersController` | `PUT /api/v1/users/me`   | `update:profile`                           | Update the caller's app-specific data. |
 | `UsersController` | `GET /api/v1/users/{id}` | `read:users` permission (the `admin` role) | Admin lookup of any user.              |
@@ -69,7 +70,9 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 - In a browser app, the API cannot tell "the app" apart from "the user": every request carries the user's token, and the user can replay it with any HTTP tool. Rules must therefore be written in terms of _what this user may access_. For a user's own data that is `/me`. `/users/{id}` is admin-only.
 - `GET /users/me` also returns the caller's `permissions`, taken from the validated token, so the UI can show or hide admin features.
 
-There is **no `AuthController`**. Auth0 handles login, logout, and token issuing and refresh directly with the Angular app.
+`AuthController` is for **diagnostics only**: it lets you confirm that a token is accepted, for example from Postman, Rider, or the frontend. It has **no login, logout, or token endpoints**. Auth0 handles those directly with the Angular app.
+
+Routes use a literal `api/v1/` prefix until `Asp.Versioning.Mvc` is added in milestone 3.
 
 ### 3.2 Orchestration (Aspire)
 
@@ -100,14 +103,29 @@ There is **no `AuthController`**. Auth0 handles login, logout, and token issuing
 Flow: the SPA uses **Authorization Code + PKCE** (see np-aspire's spec), and the API validates the resulting **access tokens**.
 
 - An Auth0 **API** (resource server) is registered. Its identifier is the token audience, which makes the SPA's tokens JWT access tokens and not opaque ones.
-- JWT bearer auth (`Microsoft.AspNetCore.Authentication.JwtBearer`) with:
-  - `Authority = https://<tenant>.auth0.com/`
-  - `Audience = <api identifier>`
-- The handler validates the signature (via JWKS), issuer, audience, and lifetime.
-- **Deny by default:** a fallback authorization policy requires an authenticated user on every endpoint. Anonymous endpoints must opt out explicitly with `[AllowAnonymous]`; health checks are one example.
-- **Permissions:** map the token's `permissions` claim to named policies (for example `[Authorize(Policy = "read:users")]`). See §5.
+  - Until Terraform manages the tenant (milestone 2), the API is created by hand in the Auth0 dashboard (Applications → APIs, signing algorithm RS256). Milestone 2 will `terraform import` it.
+- **Implemented** in `Authentication/AuthenticationExtensions.cs` (`AddAuth0Authentication`) with `Microsoft.AspNetCore.Authentication.JwtBearer`:
+  - Configuration comes from the `Auth0` section, bound to `Auth0Options` (`Domain`, `Audience`). It is validated at startup (`ValidateOnStart`), so the API refuses to start without it.
+  - `Authority = https://<Domain>/`. A leading `https://` or trailing `/` in `Domain` is tolerated.
+  - `Audience = <Audience>`.
+  - The handler validates the signature (keys come from the tenant's JWKS through OpenID metadata), issuer, audience, and lifetime (default 5-minute clock skew).
+  - Only **RS256** is accepted (`ValidAlgorithms`).
+  - `MapInboundClaims = false` keeps Auth0's claim names (`sub`, `permissions`), and `NameClaimType = "sub"`.
+- **Deny by default (implemented):** a fallback authorization policy requires an authenticated user on every endpoint.
+  - Anonymous endpoints opt out explicitly with `AllowAnonymous()`: the Development health checks and the Development OpenAPI document.
+  - **Anonymous requests to unknown routes get 401, not 404**, so unauthenticated callers can't find out which routes exist. Authenticated callers get 404.
+- **Local configuration:** the AppHost defines two Aspire **parameters**, `auth0-domain` and `auth0-audience`, and passes them to the API as `Auth0__Domain` and `Auth0__Audience`. Neither is a secret.
+  - Set them once in the AppHost's user secrets:
+    ```bash
+    dotnet user-secrets set "Parameters:auth0-domain" "<tenant>.us.auth0.com" --project src/NpAspire.AppHost
+    dotnet user-secrets set "Parameters:auth0-audience" "<API identifier>" --project src/NpAspire.AppHost
+    ```
+  - If they're missing, the Aspire dashboard asks for them.
+- **Testing without Auth0:** `tests/.../Infrastructure/ApiFactory.cs` hosts the API with test settings and swaps the tenant metadata for a local RSA key through a static OpenID configuration. `ApiFactory.CreateToken(...)` issues valid or deliberately invalid tokens: expired, wrong audience, wrong issuer, untrusted key, HS256, or malformed.
+- **Manual testing:** get a token from the Auth0 dashboard (Applications → APIs → your API → **Test** tab). Then call `GET http://localhost:5104/api/v1/auth/check` with `Authorization: Bearer <token>`, using Postman or the `NpAspire.Api.http` request, which reads `accessToken` from the gitignored `http-client.private.env.json`.
+- **Permissions** (milestone 3): map the token's `permissions` claim to named policies (for example `[Authorize(Policy = "read:users")]`). See §5.
 - Identify the caller only from the `sub` claim.
-- Add rate limiting (`Microsoft.AspNetCore.RateLimiting`) to authenticated endpoints.
+- Add rate limiting (`Microsoft.AspNetCore.RateLimiting`) to authenticated endpoints (milestone 3).
 
 Future hardening (deferred): the **backend-for-frontend (BFF)** pattern. The server handles login and keeps tokens server-side, and the browser holds only an HttpOnly cookie. This is the strongest option for browser apps, but it adds complexity that isn't needed yet.
 
@@ -348,7 +366,8 @@ Numbering is new to this repository. The equivalent milestone in the original mo
 3. **API features** [rest of monorepo M3]:
    - PostgreSQL (Aspire resource), EF Core, Dapper
    - API versioning
-   - Auth0 JWT validation with deny-by-default and permission policies
+   - ✅ Auth0 JWT validation with deny-by-default, and `GET /api/v1/auth/check` (done early, 2026-09-17)
+   - permission policies
    - the `Users` table, and `UsersController` (`/me` and the admin `/{id}`)
    - permission names exposed in OpenAPI
    - (The monorepo's M4, gateway and containers, is deferred; see §8.)

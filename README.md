@@ -16,6 +16,9 @@ Backend for np-aspire: a .NET 10 API, orchestrated locally with [Aspire](https:/
 
 ```bash
 dotnet tool restore
+# Auth0 tenant settings for local runs (not secrets; the dashboard asks if they're missing)
+dotnet user-secrets set "Parameters:auth0-domain" "<tenant>.us.auth0.com" --project src/NpAspire.AppHost
+dotnet user-secrets set "Parameters:auth0-audience" "<Auth0 API identifier>" --project src/NpAspire.AppHost
 dotnet build np-aspire-api.slnx
 dotnet run --project src/NpAspire.AppHost   # starts the Aspire dashboard and the API
 ```

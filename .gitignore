@@ -9,6 +9,7 @@ artifacts/
 coverage/
 
 # Local environment files (secrets)
+http-client.private.env.json
 .env
 .env.local
 .env.*.local
