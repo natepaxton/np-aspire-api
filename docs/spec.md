@@ -93,6 +93,7 @@ The `api/v1` prefix is applied to every controller by an MVC convention (`Routin
   - The AppHost declares a Docker Compose environment (`builder.AddDockerComposeEnvironment("env")`, package `Aspire.Hosting.Docker`).
   - `aspire publish` writes `docker-compose.yaml` and `.env` files to `src/NpAspire.AppHost/aspire-output/`. The output is generated, so it is gitignored and never edited by hand. Regenerate it after changing the AppHost.
   - The generated compose file includes an Aspire dashboard (`env-dashboard`) that receives the API's telemetry. The API image (`API_IMAGE`) and the Auth0 settings (`AUTH0_DOMAIN`, `AUTH0_AUDIENCE`) are supplied through the `.env` values.
+  - The API resource is marked `WithExternalHttpEndpoints()`, so its HTTP endpoint is published (compose `ports`) instead of being reachable only inside the container network (`expose`). Without it, `aspire deploy` reports that there are no public endpoints. This is separate from authentication: `[AllowAnonymous]` decides whether a route needs a token, not whether the port is reachable.
   - Where the compose stack runs, and how TLS is terminated, is still open (§7).
 - Secrets such as Auth0 settings and the database password come from Aspire parameters or user-secrets. Never commit them.
 
