@@ -4,9 +4,9 @@
 // Run from the test project directory (the Nx `test` target's cwd), after it is built:
 //   node <root>/tools/scripts/dotnet-test-coverage.mjs --out coverage/apps/api --lines 80 --branches 75 --methods 80
 //
-// Output (under <workspaceRoot>/<out>): Cobertura.xml (for Codecov), Summary.json, SummaryGithub.md.
+// Output (under <workspaceRoot>/<out>): cobertura.xml (for Codecov), Summary.json, SummaryGithub.md.
 import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, renameSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -53,6 +53,8 @@ run('dotnet', [
 
 // Keep only the merged report so Codecov doesn't upload the raw files as well.
 rmSync(rawDir, { recursive: true, force: true });
+// Codecov's file search is case-sensitive and only matches lowercase `cobertura.xml`.
+renameSync(resolve(outDir, 'Cobertura.xml'), resolve(outDir, 'cobertura.xml'));
 
 const { summary } = JSON.parse(readFileSync(resolve(outDir, 'Summary.json'), 'utf8'));
 const checks = [
