@@ -18,7 +18,7 @@ Accept: application/json
 GET {{apiHost}}/api/v1/diagnostics
 Accept: application/json
 
-### Auth check: 200 with a valid Auth0 access token for this API, 401 otherwise.
+### Auth check: 200 with a token granting read:profile; 401 without a usable token, 403 without a role.
 # Rider: put the token in http-client.private.env.json (gitignored) next to this file:
 #   { "dev": { "accessToken": "<access token>" } }
 # and run the request with the "dev" environment selected.

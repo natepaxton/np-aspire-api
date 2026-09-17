@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using Microsoft.IdentityModel.Tokens;
+using NpAspire.Api.Authorization;
 using NpAspire.Api.Tests.Infrastructure;
 
 namespace NpAspire.Api.Tests.Controllers;
@@ -13,11 +14,28 @@ public class AuthControllerTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task Check_ReturnsOk_WithValidToken()
+    public async Task Check_ReturnsOk_WhenTheTokenGrantsReadProfile()
     {
-        var response = await SendAsync(ApiFactory.CreateToken());
+        var response = await SendAsync(ApiFactory.CreateToken(permissions: Permissions.ReadProfile));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Check_ReturnsForbidden_WhenTheTokenGrantsNoPermissions()
+    {
+        // A user with no Auth0 role: authenticated, but not allowed (docs/spec.md §5).
+        var response = await SendAsync(ApiFactory.CreateToken());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Check_ReturnsForbidden_WhenTheTokenGrantsADifferentPermission()
+    {
+        var response = await SendAsync(ApiFactory.CreateToken(permissions: Permissions.ReadUsers));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
