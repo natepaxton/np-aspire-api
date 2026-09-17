@@ -1,4 +1,5 @@
-# The Angular frontend. Authorization Code + PKCE; no client secret is involved.
+# The Angular frontend (np-web). Authorization Code + PKCE; no client secret is involved.
+# The Auth0 application keeps the name np-aspire: renaming it is cosmetic and would churn the tenant.
 resource "auth0_client" "spa" {
   name            = var.spa_name
   app_type        = "spa"

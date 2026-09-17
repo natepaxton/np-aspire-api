@@ -1,12 +1,12 @@
 # np-aspire-api
 
-Backend for np-aspire: a single .NET 10 API orchestrated by Aspire (the single source of truth for topology — no hand-written Docker/compose files, no gateway yet). The Angular frontend is a separate repo: https://github.com/natepaxton/np-aspire
+Backend for np-aspire: a single .NET 10 API orchestrated by Aspire (the single source of truth for topology — no hand-written Docker/compose files, no gateway yet). The Angular frontend is a separate repo: https://github.com/natepaxton/np-web
 
 Full spec, architecture, and open decisions: @docs/spec.md
 
 ## Stack
 
-- **API:** .NET 10 (LTS) ASP.NET Core (controllers), PostgreSQL, EF Core + Dapper (Npgsql), OpenAPI (the contract np-aspire generates its client from)
+- **API:** .NET 10 (LTS) ASP.NET Core (controllers), PostgreSQL, EF Core + Dapper (Npgsql), OpenAPI (the contract np-web generates its client from)
 - **Auth:** Auth0 — the API validates JWT access tokens; login/tokens are handled by Auth0 and the SPA
 - **Orchestration:** Aspire 13 AppHost — the only place topology is defined; deployment files come from the Aspire Docker Compose publisher (`aspire publish` → `src/NpAspire.AppHost/aspire-output/`, gitignored)
 - **Auth0 config:** Terraform (`infra/auth0/`, `auth0/auth0` provider), driven by `infra/auth0/permissions.json`
