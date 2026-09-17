@@ -1,4 +1,4 @@
-# Test users for the dev tenant only (create_test_users = true). np-aspire's Playwright tests sign in as these.
+# Test users for the dev tenant only (create_test_users = true). np-web's Playwright tests sign in as these.
 locals {
   test_users = var.create_test_users ? {
     "test-member" = local.default_role

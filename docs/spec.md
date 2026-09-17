@@ -2,9 +2,9 @@
 
 Status: early draft. Sections marked **TBD** are open decisions.
 
-This repository holds the **backend** of np-aspire: the .NET API, the Aspire AppHost that orchestrates it, and the Auth0 configuration. The Angular frontend lives in **[np-aspire](https://github.com/natepaxton/np-aspire)**.
+This repository holds the **backend** of np-aspire: the .NET API, the Aspire AppHost that orchestrates it, and the Auth0 configuration. The Angular frontend lives in **[np-web](https://github.com/natepaxton/np-web)** (called np-aspire until it was renamed).
 
-The two repositories were one Nx monorepo until 2026-09-17. The .NET history was carried over with `git filter-repo`. The combined state is tagged `pre-api-split` in np-aspire.
+The two repositories were one Nx monorepo until 2026-09-17. The .NET history was carried over with `git filter-repo`. The combined state is tagged `pre-api-split` in np-web.
 
 ## 1. Goal
 
@@ -27,7 +27,7 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 - **Routing:** the API owns its full route, including the version: `/api/v1/...`.
 - **Local development:**
   - `dotnet run --project src/NpAspire.AppHost` starts the API, and PostgreSQL from milestone 3, with the Aspire dashboard.
-  - The frontend runs separately with `nx serve` in np-aspire. Its dev-server proxy forwards `/api` to the API's HTTP endpoint (`http://localhost:5104`), so the browser sees one origin and no CORS setup is needed in development.
+  - The frontend runs separately with `nx serve` in np-web. Its dev-server proxy forwards `/api` to the API's HTTP endpoint (`http://localhost:5104`), so the browser sees one origin and no CORS setup is needed in development.
 - **Production hosting** (same-origin reverse proxy, or CORS on the API) and TLS termination are **TBD** (§7). They will be decided together with the deployment target.
 
 ## 3. Components
@@ -46,7 +46,7 @@ The backend starts as **one API** with no gateway in front of it (decision 2026-
 - **Data Protection keys are kept in memory** (`AddInMemoryDataProtectionKeys`, `DataProtection/`). The API protects nothing, because it uses bearer tokens only (no cookies, sessions, or antiforgery). ASP.NET Core still creates a key at startup, and by default writes it unencrypted to the container's disk, which logged two warnings on every deployed start.
   - The keys are regenerated on every start and differ between instances.
   - **This is temporary.** A later story replaces it as part of a proper auth flow: when login moves server-side (BFF cookie auth, §8), the in-memory store is removed and the keys are persisted to shared storage (for example PostgreSQL) and encrypted with a certificate. Nothing may rely on protected data until then.
-- OpenAPI is served in Development (`/openapi/v1.json`). It is the **contract for the frontend**: np-aspire generates its API client from it.
+- OpenAPI is served in Development (`/openapi/v1.json`). It is the **contract for the frontend**: np-web generates its API client from it.
 
 **User data model.** Auth0 is the source of truth for identity: credentials, email verification, MFA, and social logins. The API stores only app-specific user data.
 
@@ -113,7 +113,7 @@ The `api/v1` prefix is applied to every controller by an MVC convention (`Routin
 
 ## 4. Auth and API security (Auth0)
 
-Flow: the SPA uses **Authorization Code + PKCE** (see np-aspire's spec), and the API validates the resulting **access tokens**.
+Flow: the SPA uses **Authorization Code + PKCE** (see np-web's spec), and the API validates the resulting **access tokens**.
 
 - An Auth0 **API** (resource server) is registered. Its identifier is the token audience, which makes the SPA's tokens JWT access tokens and not opaque ones.
   - Terraform creates it (§5.2). In the dev tenant it is `https://api.np-aspire.com`, applied 2026-09-17. The identifier is a name, not an address: nothing calls it. Changing it later invalidates every issued token.
@@ -203,7 +203,7 @@ There are two layers, split by what each system can know.
 - Generated files are committed and never edited by hand. CI regenerates them and fails if the output differs from what's committed (`git diff --exit-code`).
 - Auth0 itself is configured from the same manifest (§5.2), so the names in the tenant match too.
 - `"default": true` marks the role the Post-Login Action assigns. Exactly one role may be the default, and the generator validates this. It also checks that every role permission exists in `permissions`.
-- **Frontend types:** the API exposes the permission names in its OpenAPI document (as an enum on the `/users/me` response). np-aspire generates its TypeScript types from that document, so no copy of the manifest lives in the frontend repo. The exact mechanism is **TBD** (§7).
+- **Frontend types:** the API exposes the permission names in its OpenAPI document (as an enum on the `/users/me` response). np-web generates its TypeScript types from that document, so no copy of the manifest lives in the frontend repo. The exact mechanism is **TBD** (§7).
 
 ### 5.2 Auth0 configuration as code (Terraform)
 
@@ -251,7 +251,7 @@ What gets configured:
 - `test-member@np-aspire.test` with the `member` role
 - `test-admin@np-aspire.test` with the `admin` role
 - `test-norole@np-aspire.test` with no role, to verify the 403 behavior
-- Passwords come from secret variables and never from committed files. np-aspire's Playwright tests use the same credentials (GitHub secrets in that repo's CI).
+- Passwords come from secret variables and never from committed files. np-web's Playwright tests use the same credentials (GitHub secrets in that repo's CI).
 
 **Commands** (planned; no Nx in this repo). Load the env file first with `set -a; source infra/auth0/.env.local; set +a`, then:
 
@@ -329,7 +329,7 @@ A small wrapper script may replace these in milestone 2.
 
 ## 7. Open decisions
 
-- How np-aspire consumes the API contract and permission types: an OpenAPI client generator, and whether it reads the document from a committed file, a release artifact, or a running API.
+- How np-web consumes the API contract and permission types: an OpenAPI client generator, and whether it reads the document from a committed file, a release artifact, or a running API.
 - **Production hosting and TLS:** where the Docker Compose stack (§3.2) and the frontend run, whether they share an origin (a platform reverse proxy) or the API enables CORS for the frontend's origin, and where HTTPS terminates.
 - Remote Terraform state backend (needed before CI runs `terraform apply`).
 
