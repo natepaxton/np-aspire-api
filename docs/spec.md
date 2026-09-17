@@ -197,7 +197,9 @@ There are two layers, split by what each system can know.
 }
 ```
 
-- A generator script (`scripts/generate-permissions`, implementation chosen in milestone 2) writes `src/NpAspire.Api/Authorization/Permissions.g.cs`: C# constants, plus a registration helper that creates one authorization policy per permission.
+- `scripts/generate-permissions.mjs` (Node, like `coverage-check.mjs`) writes `src/NpAspire.Api/Authorization/Permissions.g.cs`: C# constants, an `All` array, and `AddPermissionPolicies()`, which adds one policy per permission, named after it and requiring that value in the `permissions` claim. `AddAuth0Authentication` calls it after setting the deny-by-default fallback policy.
+  - `node scripts/generate-permissions.mjs` regenerates the file; `--check` fails instead of writing, which is what CI runs.
+  - The script rejects a manifest with duplicate permissions, a permission that isn't `<action>:<resource>`, a role granting an unknown permission, or anything other than exactly one default role.
 - Generated files are committed and never edited by hand. CI regenerates them and fails if the output differs from what's committed (`git diff --exit-code`).
 - Auth0 itself is configured from the same manifest (§5.2), so the names in the tenant match too.
 - `"default": true` marks the role the Post-Login Action assigns. Exactly one role may be the default, and the generator validates this. It also checks that every role permission exists in `permissions`.
@@ -278,7 +280,7 @@ A small wrapper script may replace these in milestone 2.
   5. ReportGenerator's Markdown summary written to the job summary
   6. Upload `coverage/cobertura.xml` to Codecov, and upload the coverage directory as an artifact
 - **Later additions:**
-  - `generate-permissions` drift check and `terraform fmt`/`validate` (milestone 2)
+  - ✅ `generate-permissions` drift check (`node scripts/generate-permissions.mjs --check`, runs before the build); `terraform fmt`/`validate` still to add
   - `terraform plan` PR comment
 
 **Code coverage**
@@ -372,7 +374,7 @@ Numbering is new to this repository. The equivalent milestone in the original mo
 
 1. ✅ **API skeleton and Aspire** [monorepo M2] (done 2026-09-17). Details below.
 2. **Permissions and Auth0** [part of monorepo M3]:
-   - ✅ `permissions.json` (done 2026-09-17); the generator and its CI drift check are still to do
+   - ✅ `permissions.json`, the generator, and its CI drift check (done 2026-09-17)
    - ✅ Terraform applied to the dev tenant 2026-09-17: API (`https://api.np-aspire.com`), permissions, `member`/`admin` roles, SPA client, `role-assigner` M2M client, Post-Login Action and trigger, three test users
    - Dependabot `terraform` ecosystem, and `terraform fmt`/`validate` in CI
 3. **API features** [rest of monorepo M3]:

@@ -30,6 +30,7 @@ Full spec, architecture, and open decisions: @docs/spec.md
 - Test: `dotnet test --solution np-aspire-api.slnx`
 - Test with coverage + minimums (as CI does): `dotnet build np-aspire-api.slnx && node scripts/coverage-check.mjs --project tests/NpAspire.Api.Tests --out coverage --lines 80 --branches 75 --methods 80`
 - Format: `dotnet format np-aspire-api.slnx` (CI runs `--verify-no-changes`)
+- Regenerate permissions after editing `infra/auth0/permissions.json`: `node scripts/generate-permissions.mjs` (CI runs `--check`)
 - Run everything (dev): `dotnet run --project src/NpAspire.AppHost` (the AppHost SDK bundles what it needs)
 - Aspire CLI (optional, machine-wide — not in the tool manifest, see spec §3.3): `curl -sSL https://aspire.dev/install.sh | bash`; then `aspire run`, `aspire describe`
 - Generate Docker Compose files (needs the Aspire CLI): `aspire publish` (output in `src/NpAspire.AppHost/aspire-output/`)

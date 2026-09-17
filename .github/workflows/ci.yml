@@ -49,6 +49,10 @@ jobs:
       - name: Format
         run: dotnet format np-aspire-api.slnx --no-restore --verify-no-changes
 
+      # Permissions.g.cs must match infra/auth0/permissions.json.
+      - name: Permissions drift check
+        run: node scripts/generate-permissions.mjs --check
+
       - name: Build
         run: dotnet build np-aspire-api.slnx --no-restore
 
