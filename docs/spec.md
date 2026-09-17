@@ -116,7 +116,7 @@ The `api/v1` prefix is applied to every controller by an MVC convention (`Routin
 Flow: the SPA uses **Authorization Code + PKCE** (see np-aspire's spec), and the API validates the resulting **access tokens**.
 
 - An Auth0 **API** (resource server) is registered. Its identifier is the token audience, which makes the SPA's tokens JWT access tokens and not opaque ones.
-  - Until Terraform manages the tenant (milestone 2), the API is created by hand in the Auth0 dashboard (Applications → APIs, signing algorithm RS256). Milestone 2 will `terraform import` it.
+  - Terraform creates it (§5.2). In the dev tenant it is `https://api.np-aspire.com`, applied 2026-09-17. The identifier is a name, not an address: nothing calls it. Changing it later invalidates every issued token.
 - **Implemented** in `Authentication/AuthenticationExtensions.cs` (`AddAuth0Authentication`) with `Microsoft.AspNetCore.Authentication.JwtBearer`:
   - Configuration comes from the `Auth0` section, bound to `Auth0Options` (`Domain`, `Audience`). It is validated at startup (`ValidateOnStart`), so the API refuses to start without it.
   - `Authority = https://<Domain>/`. A leading `https://` or trailing `/` in `Domain` is tolerated.
@@ -236,7 +236,7 @@ What gets configured:
 
 **Layout:**
 
-- `providers.tf`, `variables.tf`, `outputs.tf`
+- `providers.tf`, `variables.tf`, `outputs.tf`, `locals.tf` (reads the manifest, resolves the default role)
 - `api.tf`: resource server, RBAC, token lifetime
 - `rbac.tf`: permissions and roles, from the manifest
 - `spa.tf`: SPA client and its URLs
@@ -246,9 +246,9 @@ What gets configured:
 
 **Test users** (dev tenant only, `create_test_users = true`):
 
-- `test-member@<domain>` with the `member` role
-- `test-admin@<domain>` with the `admin` role
-- `test-norole@<domain>` with no role, to verify the 403 behavior
+- `test-member@np-aspire.test` with the `member` role
+- `test-admin@np-aspire.test` with the `admin` role
+- `test-norole@np-aspire.test` with no role, to verify the 403 behavior
 - Passwords come from secret variables and never from committed files. np-aspire's Playwright tests use the same credentials (GitHub secrets in that repo's CI).
 
 **Commands** (planned; no Nx in this repo). Load the env file first with `set -a; source infra/auth0/.env.local; set +a`, then:
@@ -372,8 +372,8 @@ Numbering is new to this repository. The equivalent milestone in the original mo
 
 1. ✅ **API skeleton and Aspire** [monorepo M2] (done 2026-09-17). Details below.
 2. **Permissions and Auth0** [part of monorepo M3]:
-   - `permissions.json` and the generator, with a CI drift check
-   - Terraform for the dev tenant: API, roles, SPA client, Post-Login Action, test users
+   - ✅ `permissions.json` (done 2026-09-17); the generator and its CI drift check are still to do
+   - ✅ Terraform applied to the dev tenant 2026-09-17: API (`https://api.np-aspire.com`), permissions, `member`/`admin` roles, SPA client, `role-assigner` M2M client, Post-Login Action and trigger, three test users
    - Dependabot `terraform` ecosystem, and `terraform fmt`/`validate` in CI
 3. **API features** [rest of monorepo M3]:
    - PostgreSQL (Aspire resource), EF Core, Dapper
