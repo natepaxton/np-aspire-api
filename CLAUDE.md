@@ -24,6 +24,8 @@ Full spec, architecture, and open decisions: @docs/spec.md
 ## Commands
 
 - After cloning: `dotnet tool restore` (ReportGenerator, pinned in `dotnet-tools.json`)
+- Auth0 settings for local runs (AppHost parameters, not secrets): `dotnet user-secrets set "Parameters:auth0-domain" "<tenant>.us.auth0.com" --project src/NpAspire.AppHost` and the same for `Parameters:auth0-audience` (the Auth0 API identifier); the dashboard prompts if they're missing
+- Test auth manually: `curl -H "Authorization: Bearer <token>" http://localhost:5104/api/v1/auth/check` (token from Auth0 dashboard → APIs → Test); Rider reads `accessToken` from gitignored `src/NpAspire.Api/http-client.private.env.json`
 - Build: `dotnet build np-aspire-api.slnx`
 - Test: `dotnet test --solution np-aspire-api.slnx`
 - Test with coverage + minimums (as CI does): `dotnet build np-aspire-api.slnx && node scripts/coverage-check.mjs --project tests/NpAspire.Api.Tests --out coverage --lines 80 --branches 75 --methods 80`
@@ -36,8 +38,9 @@ Full spec, architecture, and open decisions: @docs/spec.md
 
 - API routes are `api/v{version}/<plural-resource>` via `Asp.Versioning.Mvc`; controllers are plural (`UsersController`). Keep the `/api/v1/` prefix so a gateway can be added later without client changes.
 - EF Core for writes and migrations, Dapper for read-heavy queries.
-- The API validates Auth0 JWTs itself. Auth0 owns login/tokens — don't build login endpoints in the API.
-- API is deny-by-default (fallback policy requires auth); opt out explicitly with `[AllowAnonymous]`.
+- The API validates Auth0 JWTs itself (`AddAuth0Authentication`: RS256 only, `MapInboundClaims = false`, config section `Auth0` validated on start). Auth0 owns login/tokens — don't build login/logout/token endpoints. `AuthController` is diagnostics only (`GET /api/v1/auth/check`).
+- API is deny-by-default (fallback policy requires auth); opt out explicitly with `[AllowAnonymous]`/`.AllowAnonymous()`. Anonymous requests to unknown routes return 401 (not 404) by design.
+- API tests use `Infrastructure/ApiFactory` (test Auth0 settings + local RSA signing key; `ApiFactory.CreateToken(...)`), never a bare `WebApplicationFactory<Program>` — the API won't start without Auth0 settings.
 - Authorization: Auth0 RBAC supplies `permissions` (`<action>:<resource>`) in the access token; the API checks permissions via named policies, never role names. Record-level rules (ownership etc.) live in the API.
 - Permissions/roles are defined only in `infra/auth0/permissions.json`. Never hand-type permission strings; use the generated `Permissions.g.cs` (never edit `*.g.*` files). Expose permission names in OpenAPI so the frontend can generate its types.
 - Roles: `member` (default, auto-assigned on first login) and `admin` (includes all `member` permissions — Auth0 roles don't inherit). A user with no role gets 403.

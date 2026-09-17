@@ -1,10 +1,11 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
+using System.Net.Http.Headers;
+using NpAspire.Api.Tests.Infrastructure;
 
 namespace NpAspire.Api.Tests.Endpoints;
 
-public class DefaultEndpointsTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+public class DefaultEndpointsTests(ApiFactory factory)
+    : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -29,9 +30,21 @@ public class DefaultEndpointsTests(WebApplicationFactory<Program> factory)
     }
 
     [Fact]
-    public async Task UnknownRoute_ReturnsNotFound()
+    public async Task UnknownRoute_ReturnsUnauthorized_WhenAnonymous()
     {
+        // Deny by default: anonymous callers can't probe which routes exist.
         var response = await _client.GetAsync("/does-not-exist", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UnknownRoute_ReturnsNotFound_WhenAuthenticated()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/does-not-exist");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ApiFactory.CreateToken());
+
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
