@@ -1,11 +1,15 @@
-@NpAspire.Api_HostAddress = http://localhost:5104
+# Requests for the API while it runs locally (`dotnet run --project src/NpAspire.AppHost`).
+# Variable names must not contain dots: Rider's HTTP client can't resolve them.
+@apiHost = http://localhost:5104
 
-GET {{NpAspire.Api_HostAddress}}/health
+### Health: all checks (Development only)
+GET {{apiHost}}/health
 Accept: text/plain
 
-###
+### Liveness: checks tagged "live" (Development only)
+GET {{apiHost}}/alive
+Accept: text/plain
 
-GET {{NpAspire.Api_HostAddress}}/openapi/v1.json
+### OpenAPI document (Development only)
+GET {{apiHost}}/openapi/v1.json
 Accept: application/json
-
-###
