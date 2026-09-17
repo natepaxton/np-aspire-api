@@ -1,0 +1,39 @@
+# Codecov reports coverage on PRs. Minimum coverage is enforced by scripts/coverage-check.mjs;
+# Codecov adds PR comments and the patch (new code) check.
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  status:
+    project:
+      default:
+        # Overall coverage may not drop by more than 1% compared to the base commit.
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        # Lines added or changed in a PR must be at least 80% covered.
+        target: 80%
+
+comment:
+  layout: 'condensed_header, diff, components, condensed_files'
+  behavior: default
+  require_changes: false
+
+# One component per deployable project. Add an entry when a new project gets tests.
+component_management:
+  individual_components:
+    - component_id: api
+      name: api
+      paths:
+        - src/NpAspire.Api/**
+
+# Mirrors the exclusions in tests/*/testconfig.json.
+ignore:
+  - 'src/NpAspire.AppHost/**'
+  - 'src/NpAspire.ServiceDefaults/**'
+  - 'tests/**'
+  - '**/Migrations/**'
+  - '**/*.g.cs'

@@ -9,7 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../../aspire/ServiceDefaults/NpAspire.ServiceDefaults.csproj" />
+    <ProjectReference Include="../NpAspire.ServiceDefaults/NpAspire.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,31 +1,12 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-tmp/
-out-tsc/
-.angular/
-coverage/
-
-# Nx
-.nx/cache
-.nx/workspace-data
-.nx/migrate-runs
-.nx/polygraph
-.nx/self-healing
-
-# Playwright
-test-output/
-playwright-report/
-blob-report/
-playwright/.cache/
-
-# .NET
+# .NET build output
 bin/
 obj/
 *.user
 TestResults/
+artifacts/
+
+# Coverage
+coverage/
 
 # Local environment files (secrets)
 .env
@@ -42,13 +23,12 @@ crash.log
 
 # IDEs and editors
 .idea/
+.vs/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
-*.sublime-workspace
 
 # Logs
-npm-debug.log*
 *.log
 
 # System files

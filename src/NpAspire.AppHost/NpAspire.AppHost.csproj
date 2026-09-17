@@ -1,7 +1,7 @@
 <Project Sdk="Aspire.AppHost.Sdk/13.5.4">
 
   <ItemGroup>
-    <ProjectReference Include="../../apps/api/src/NpAspire.Api/NpAspire.Api.csproj" />
+    <ProjectReference Include="../NpAspire.Api/NpAspire.Api.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

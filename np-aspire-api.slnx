@@ -1,6 +1,10 @@
 <Solution>
-  <Project Path="apps/api/src/NpAspire.Api/NpAspire.Api.csproj" />
-  <Project Path="apps/api/tests/NpAspire.Api.Tests/NpAspire.Api.Tests.csproj" />
-  <Project Path="aspire/AppHost/NpAspire.AppHost.csproj" />
-  <Project Path="aspire/ServiceDefaults/NpAspire.ServiceDefaults.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/NpAspire.Api/NpAspire.Api.csproj" />
+    <Project Path="src/NpAspire.AppHost/NpAspire.AppHost.csproj" />
+    <Project Path="src/NpAspire.ServiceDefaults/NpAspire.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NpAspire.Api.Tests/NpAspire.Api.Tests.csproj" />
+  </Folder>
 </Solution>

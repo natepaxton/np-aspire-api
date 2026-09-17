@@ -1,20 +1,19 @@
 // Runs a .NET test project with Coverlet (Microsoft Testing Platform), merges the results with
 // ReportGenerator, and fails if coverage is below the given minimums.
 //
-// Run from the test project directory (the Nx `test` target's cwd), after it is built:
-//   node <root>/tools/scripts/dotnet-test-coverage.mjs --out coverage/apps/api --lines 80 --branches 75 --methods 80
+// Run from the repository root after `dotnet build`:
+//   node scripts/coverage-check.mjs --project tests/NpAspire.Api.Tests --out coverage --lines 80 --branches 75 --methods 80
 //
-// Output (under <workspaceRoot>/<out>): cobertura.xml (for Codecov), Summary.json, SummaryGithub.md.
+// Output (under <out>): cobertura.xml (for Codecov), Summary.json, SummaryGithub.md (CI job summary).
+// Neither coverlet.MTP nor the ReportGenerator CLI can enforce minimums, which is why this script exists.
 import { spawnSync } from 'node:child_process';
 import { readFileSync, renameSync, rmSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-
-const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const { values } = parseArgs({
   options: {
+    project: { type: 'string' },
     out: { type: 'string' },
     lines: { type: 'string' },
     branches: { type: 'string' },
@@ -22,12 +21,14 @@ const { values } = parseArgs({
   },
 });
 
-if (!values.out || !values.lines || !values.branches || !values.methods) {
-  console.error('Usage: dotnet-test-coverage.mjs --out <dir> --lines <pct> --branches <pct> --methods <pct>');
+if (!values.project || !values.out || !values.lines || !values.branches || !values.methods) {
+  console.error(
+    'Usage: coverage-check.mjs --project <test project dir> --out <dir> --lines <pct> --branches <pct> --methods <pct>',
+  );
   process.exit(2);
 }
 
-const outDir = resolve(workspaceRoot, values.out);
+const outDir = resolve(values.out);
 const rawDir = resolve(outDir, 'raw');
 
 function run(command, args) {
@@ -39,7 +40,7 @@ function run(command, args) {
 
 rmSync(outDir, { recursive: true, force: true });
 
-run('dotnet', ['test', '--no-build', '--no-restore', '--coverlet', '--results-directory', rawDir]);
+run('dotnet', ['test', '--project', values.project, '--no-build', '--coverlet', '--results-directory', rawDir]);
 
 run('dotnet', [
   'tool',
@@ -73,6 +74,6 @@ for (const [name, actual, minimum] of checks) {
 }
 
 if (failed) {
-  console.error(`Coverage is below the minimum for ${values.out}.`);
+  console.error(`Coverage is below the minimum for ${values.project}.`);
   process.exit(1);
 }

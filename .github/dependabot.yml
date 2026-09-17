@@ -1,0 +1,83 @@
+# Dependabot version updates. Security updates are enabled separately in the repo settings.
+# Docs: https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+version: 2
+
+updates:
+  # NuGet packages (Directory.Packages.props, project SDK versions) and .NET local tools (dotnet-tools.json).
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    # Wait before proposing brand-new releases (limits exposure to compromised or broken publishes).
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    commit-message:
+      prefix: deps
+    labels:
+      - dependencies
+    # Groups are matched in order; a dependency joins the first group it matches.
+    groups:
+      # Aspire hosting packages and the AppHost SDK ship together.
+      aspire:
+        patterns:
+          - 'Aspire.*'
+      aspnetcore-and-extensions:
+        patterns:
+          - 'Microsoft.AspNetCore.*'
+          - 'Microsoft.Extensions.*'
+      opentelemetry:
+        patterns:
+          - 'OpenTelemetry*'
+      testing:
+        patterns:
+          - 'xunit*'
+          - 'coverlet*'
+          - 'dotnet-reportgenerator-globaltool'
+      # Everything else: minor and patch updates in one PR. Other major updates arrive as individual PRs.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+
+  # .NET SDK version in global.json.
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/New_York
+    commit-message:
+      prefix: deps
+    labels:
+      - dependencies
+    # Stay on the .NET 10 LTS line; moving to a new major is a deliberate upgrade.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - '*'
